@@ -174,7 +174,7 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
             {
                 ShowBalloon("Focus session ended", "You ended the session early.", ToolTipIcon.Info);
             }
-            PromptAchievement();
+            PromptAchievement("Focus session ended");
         }
         catch (Exception ex)
         {
@@ -217,11 +217,11 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
         UpdateTooltip();
         RaiseStateChanged();
         NotifyCompleted();
-        PromptAchievement();
+        PromptAchievement("Focus session complete");
     }
 
     // Ask what was achieved; if the user enters text, log it to RescueTime as a highlight.
-    private void PromptAchievement()
+    private void PromptAchievement(string title)
     {
         if (!_config.PromptForAchievement || string.IsNullOrWhiteSpace(_config.ApiKey))
         {
@@ -234,7 +234,7 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
             return;
         }
 
-        var form = new AchievementForm("Anything you note is saved to RescueTime as a highlight.");
+        var form = new AchievementForm(title, "Anything you note is saved to RescueTime as a highlight.");
         form.Saved += text => _ = SaveHighlightAsync(text);
         form.FormClosed += (_, _) => _achievementForm = null;
         _achievementForm = form;

@@ -15,9 +15,9 @@ public sealed class AchievementForm : Form
     /// <summary>Raised with the (non-empty, trimmed) text when the user saves.</summary>
     public event Action<string>? Saved;
 
-    public AchievementForm(string subtitle)
+    public AchievementForm(string title, string subtitle)
     {
-        Text = "Focus session complete";
+        Text = title;
         FormBorderStyle = FormBorderStyle.FixedToolWindow;
         StartPosition = FormStartPosition.Manual;
         ShowInTaskbar = false;
