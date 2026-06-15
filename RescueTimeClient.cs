@@ -229,7 +229,13 @@ public sealed class RescueTimeClient : IDisposable
         var events = new List<(DateTime time, bool isStart)>(started.Count + ended.Count);
         foreach (FocusFeedEntry s in started) events.Add((s.Time, true));
         foreach (FocusFeedEntry e in ended) events.Add((e.Time, false));
-        events.Sort((a, b) => a.time != b.time ? a.time.CompareTo(b.time) : (b.isStart ? 1 : -1));
+        events.Sort((a, b) =>
+        {
+            int byTime = a.time.CompareTo(b.time);
+            if (byTime != 0) return byTime;
+            if (a.isStart == b.isStart) return 0;
+            return a.isStart ? -1 : 1; // at equal times, opens sort before closes
+        });
 
         double focused = 0;
         DateTime? open = null;

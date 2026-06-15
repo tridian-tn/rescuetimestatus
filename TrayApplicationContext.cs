@@ -399,7 +399,8 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
             _focusSessionsToday = info.Summary.SessionCount;
             _focusSecondsToday = info.Summary.FocusedSeconds;
 
-            switch (_focus.Reconcile(info.State))
+            FocusReconcileResult result = _focus.Reconcile(info.State);
+            switch (result)
             {
                 case FocusReconcileResult.Adopted:
                     if (_config.ShowFocusNotifications)
@@ -421,8 +422,12 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
                     break;
             }
 
-            // Surface refreshed today's-focus totals to the flyout, even when state didn't change.
-            RaiseStateChanged();
+            // Adopted/EndedEarly/Completed already raised StateChanged via the focus Changed event.
+            // Only raise here when state was unchanged but today's totals may have refreshed.
+            if (result == FocusReconcileResult.None)
+            {
+                RaiseStateChanged();
+            }
         }
         catch
         {
