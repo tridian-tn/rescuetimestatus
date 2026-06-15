@@ -12,6 +12,8 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <!-- A tray-only app: keep the console window hidden and don't flash a window on start -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Icon shown for the .exe in Explorer, the taskbar, and Alt+Tab -->
+    <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
 
 </Project>

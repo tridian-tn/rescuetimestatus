@@ -153,3 +153,5 @@ The result lands in `bin/Release/net8.0-windows/win-x64/publish/RescueTimeStatus
 - `ApiKeyForm.cs` — first-run / settings dialog
 - `AppConfig.cs` — JSON settings in `%APPDATA%`
 - `StartupManager.cs` — launch-at-login toggle
+- `AppIcon.cs` — loads the app icon for dialog title bars
+- `app.ico` — application icon (taskbar / Explorer / Alt+Tab); a heartbeat "pulse" badge

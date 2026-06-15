@@ -45,6 +45,7 @@ public sealed class ApiKeyForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = true;
+        Icon = AppIcon.Value;
         Font = new Font("Segoe UI", 9f);
         AutoScaleMode = AutoScaleMode.Font;
         AutoScaleDimensions = new SizeF(7f, 15f);

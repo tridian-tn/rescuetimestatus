@@ -25,6 +25,7 @@ public sealed class ReminderForm : Form
         StartPosition = FormStartPosition.Manual;
         ShowInTaskbar = false;
         TopMost = true;
+        Icon = AppIcon.Value;
         ClientSize = new Size(320, 146);
         Font = new Font("Segoe UI", 9f);
 
