@@ -14,6 +14,10 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
 {
     private static readonly int[] FocusDurations = { 15, 25, 30, 45, 60, 90 };
 
+    // When pulse refreshes fail, the poll interval grows exponentially (base, base×2, base×4…)
+    // up to this cap, then snaps back to normal on the next success.
+    private const int MaxBackoffMs = 30 * 60_000;
+
     private readonly NotifyIcon _notifyIcon;
     private readonly System.Windows.Forms.Timer _timer;
     private readonly System.Windows.Forms.Timer _focusPollTimer;
@@ -26,6 +30,7 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
     private SoundPlayer? _endSoundPlayer;
     private bool _isRefreshing;
     private bool _isReconciling;
+    private int _consecutiveFailures;
 
     private int? _lastPulse;
     private double? _lastTotalSeconds;
@@ -408,11 +413,13 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
             RenderIcon();
             UpdateTooltip();
             RaiseStateChanged();
+            OnRefreshSucceeded();
         }
         catch (Exception ex)
         {
             RenderIcon(); // keep the last pulse (or dash), plus the focus ring if active
             _notifyIcon.Text = Clip((ex is RescueTimeException ? "RescueTime: " : "Error: ") + ex.Message);
+            OnRefreshFailed();
         }
         finally
         {
@@ -424,6 +431,49 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
     {
         await RefreshAsync();
         await ReconcileFocusAsync();
+    }
+
+    // ----- Refresh backoff --------------------------------------------------
+    // The pulse poll normally runs every RefreshMinutes. When calls start failing
+    // (network down, RescueTime outage/throttling) we stop hammering and grow the
+    // interval exponentially — base, base×2, base×4… — capped, with a little jitter so
+    // many clients recovering from an outage don't all retry in lockstep. The first
+    // success resets it to the normal cadence.
+
+    private void OnRefreshSucceeded()
+    {
+        if (_consecutiveFailures == 0)
+        {
+            return; // already on the normal cadence — nothing to reset
+        }
+        _consecutiveFailures = 0;
+        RearmRefreshTimer(RefreshIntervalMs);
+    }
+
+    private void OnRefreshFailed()
+    {
+        _consecutiveFailures++;
+        RearmRefreshTimer(BackoffIntervalMs());
+    }
+
+    private int BackoffIntervalMs()
+    {
+        int baseMs = RefreshIntervalMs;
+        long cap = Math.Max(baseMs, (long)MaxBackoffMs);
+
+        // base × 2^(failures-1): the first failure retries at the normal cadence, then doubles.
+        int exponent = Math.Min(_consecutiveFailures - 1, 16); // 16 keeps the shift well within long
+        long scaled = Math.Min((long)baseMs << exponent, cap);
+
+        double jittered = scaled * (0.9 + Random.Shared.NextDouble() * 0.2);
+        return (int)Math.Clamp(jittered, baseMs, (double)cap);
+    }
+
+    private void RearmRefreshTimer(int intervalMs)
+    {
+        _timer.Stop();
+        _timer.Interval = Math.Max(1, intervalMs);
+        _timer.Start();
     }
 
     private async Task ReconcileFocusAsync()
@@ -539,9 +589,9 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
         _config.RemindOnlyWeekdays = form.RemindOnlyWeekdays;
         _config.Save();
 
-        _timer.Stop();
-        _timer.Interval = RefreshIntervalMs;
-        _timer.Start();
+        // New settings (possibly a fixed API key) — drop any backoff and poll at the base cadence.
+        _consecutiveFailures = 0;
+        RearmRefreshTimer(RefreshIntervalMs);
 
         // Re-arm reminders under the new schedule.
         _snoozeUntil = null;
