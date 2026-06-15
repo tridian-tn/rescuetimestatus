@@ -10,7 +10,7 @@ namespace RescueTimeStatus;
 /// <summary>
 /// Owns the tray icon, the refresh timer, focus-session control, and the right-click menu.
 /// </summary>
-public sealed class TrayApplicationContext : ApplicationContext
+public sealed class TrayApplicationContext : ApplicationContext, IStatusController
 {
     private static readonly int[] FocusDurations = { 15, 25, 30, 45, 60, 90 };
 
@@ -35,6 +35,10 @@ public sealed class TrayApplicationContext : ApplicationContext
     private DateTime _lastReminderSlot = DateTime.MinValue;
     private DateTime? _snoozeUntil;
 
+    private StatusPopup? _popup;
+    private DateTime _popupHiddenAt = DateTime.MinValue;
+    private Action? _stateChanged;
+
     public TrayApplicationContext()
     {
         _config = AppConfig.Load();
@@ -50,7 +54,13 @@ public sealed class TrayApplicationContext : ApplicationContext
             Icon = _currentIcon,
             Text = "RescueTime Status — starting…",
         };
-        _notifyIcon.DoubleClick += (_, _) => OpenDashboard();
+        _notifyIcon.MouseUp += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                TogglePopup();
+            }
+        };
         _notifyIcon.ContextMenuStrip = BuildMenu();
 
         _timer = new System.Windows.Forms.Timer { Interval = RefreshIntervalMs };
@@ -86,6 +96,9 @@ public sealed class TrayApplicationContext : ApplicationContext
     {
         var menu = new ContextMenuStrip();
         menu.Opening += (_, _) => PopulateMenu(menu);
+        // Pre-fill so the very first right-click has a non-empty, correctly-sized menu.
+        // (An initially-empty ContextMenuStrip can fail to show on the first click.)
+        PopulateMenu(menu);
         return menu;
     }
 
@@ -176,6 +189,8 @@ public sealed class TrayApplicationContext : ApplicationContext
         {
             CloseReminder();
         }
+
+        RaiseStateChanged();
     }
 
     // Run the 60-second feed poll only while a session is active. Toggled on transitions
@@ -196,7 +211,28 @@ public sealed class TrayApplicationContext : ApplicationContext
     {
         RenderIcon();
         UpdateTooltip();
+        RaiseStateChanged();
         NotifyCompleted();
+    }
+
+    private async Task RestartFocusAsync()
+    {
+        int minutes = _focus.RequestedMinutes;
+        if (minutes == 0)
+        {
+            minutes = _config.DefaultFocusMinutes;
+        }
+
+        try
+        {
+            await _focus.EndAsync();
+        }
+        catch
+        {
+            // If ending fails, still try to start a fresh one below.
+        }
+
+        await StartFocusAsync(minutes);
     }
 
     private void NotifyCompleted()
@@ -328,6 +364,7 @@ public sealed class TrayApplicationContext : ApplicationContext
             _lastUpdated = snap.RetrievedAt;
             RenderIcon();
             UpdateTooltip();
+            RaiseStateChanged();
         }
         catch (Exception ex)
         {
@@ -515,6 +552,61 @@ public sealed class TrayApplicationContext : ApplicationContext
     // NotifyIcon tooltips are capped at 63 characters.
     private static string Clip(string s) => s.Length <= 63 ? s : s[..60] + "…";
 
+    // ----- Status flyout (single left-click) --------------------------------
+
+    private void TogglePopup()
+    {
+        if (_popup is { Visible: true })
+        {
+            _popup.Hide();
+            return;
+        }
+
+        // If the flyout was just hidden (e.g. this same click deactivated it), don't reopen it.
+        if ((DateTime.Now - _popupHiddenAt).TotalMilliseconds < 300)
+        {
+            return;
+        }
+
+        _popup ??= CreatePopup();
+        _popup.ShowNearTray();
+    }
+
+    private StatusPopup CreatePopup()
+    {
+        var popup = new StatusPopup(this);
+        popup.Deactivate += (_, _) =>
+        {
+            _popupHiddenAt = DateTime.Now;
+            popup.Hide();
+        };
+        return popup;
+    }
+
+    private void RaiseStateChanged() => _stateChanged?.Invoke();
+
+    int? IStatusController.Pulse => _lastPulse;
+    double? IStatusController.TotalSeconds => _lastTotalSeconds;
+    DateTime? IStatusController.LastUpdated => _lastUpdated;
+    bool IStatusController.FocusActive => _focus.IsActive;
+    TimeSpan IStatusController.FocusRemaining => _focus.Remaining;
+    double IStatusController.FocusRemainingFraction => _focus.RemainingFraction;
+    int IStatusController.FocusRequestedMinutes => _focus.RequestedMinutes;
+    int IStatusController.DefaultFocusMinutes => _config.DefaultFocusMinutes;
+
+    void IStatusController.StartDefaultFocus() => _ = StartFocusAsync(_config.DefaultFocusMinutes);
+    void IStatusController.StopFocus() => _ = EndFocusAsync();
+    void IStatusController.RestartFocus() => _ = RestartFocusAsync();
+    void IStatusController.RefreshNow() => _ = RefreshAllAsync();
+    void IStatusController.OpenDashboard() => OpenDashboard();
+    void IStatusController.OpenSettings() => PromptForSettings();
+
+    event Action IStatusController.StateChanged
+    {
+        add => _stateChanged += value;
+        remove => _stateChanged -= value;
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)
@@ -523,6 +615,7 @@ public sealed class TrayApplicationContext : ApplicationContext
             _focusPollTimer.Dispose();
             _reminderTimer.Dispose();
             _reminderForm?.Dispose();
+            _popup?.Dispose();
             _focus.Dispose();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();

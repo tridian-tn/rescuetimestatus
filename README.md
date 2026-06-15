@@ -2,7 +2,8 @@
 
 A lightweight Windows system-tray app that shows your **RescueTime Productivity Pulse**
 as a number on the tray icon, color-coded by how your day is going. Hover the icon to see
-the pulse and **time logged today**, and right-click to **start/stop a Focus Session**.
+the pulse and **time logged today**, **single-click** for a status flyout with focus controls,
+and right-click to **start/stop a Focus Session**.
 
 | Icon color | Pulse  | Meaning            |
 |------------|--------|--------------------|
@@ -11,6 +12,19 @@ the pulse and **time logged today**, and right-click to **start/stop a Focus Ses
 | 🔴 Red     | 0–49   | Distracted         |
 
 The tooltip reads, e.g.: `Pulse 82%  •  5h 23m logged today  (14:05)`.
+
+## Status flyout (single-click)
+
+A single left-click on the tray icon opens a small flyout near the tray showing:
+
+- Today's **productivity pulse** (color-coded) and **time logged**, with the last-updated time.
+- **Focus controls** that match the current state:
+  - *Idle* → a **Start focus · N min** button (uses the default length).
+  - *Running* → time remaining, a progress bar, and **Stop** / **Restart** buttons.
+- Footer links: **Refresh**, **Dashboard**, **Settings**.
+
+It updates live (counts down while a session runs) and closes when it loses focus or on another
+single-click.
 
 ## Focus Sessions
 
@@ -95,7 +109,7 @@ just finalized past days.
 - **Start default (N min)** — one-click using the configured default length
 - **End focus session (mm:ss left)** — shown instead while a session is active
 - **Refresh now** — fetch immediately
-- **Open RescueTime dashboard** — opens the web dashboard (also on double-click)
+- **Open RescueTime dashboard** — opens the web dashboard (also from the flyout footer)
 - **Settings…** — API key, refresh interval, default focus length, notifications & sound, reminders
 - **Start with Windows** — toggle launch at login (per-user `Run` registry key)
 - **Exit**
@@ -135,6 +149,7 @@ The result lands in `bin/Release/net8.0-windows/win-x64/publish/RescueTimeStatus
 - `TrayIconRenderer.cs` — draws the number + countdown ring onto the icon
 - `ReminderSchedule.cs` — pure work-hours / reminder-slot logic
 - `ReminderForm.cs` — the persistent "time to focus?" popup
+- `StatusPopup.cs` — the single-click status flyout (`IStatusController` + the form)
 - `ApiKeyForm.cs` — first-run / settings dialog
 - `AppConfig.cs` — JSON settings in `%APPDATA%`
 - `StartupManager.cs` — launch-at-login toggle
