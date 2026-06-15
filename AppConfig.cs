@@ -25,6 +25,9 @@ public sealed class AppConfig
     /// <summary>Optional path to a custom .wav for the end-of-session sound (empty = system sound).</summary>
     public string FocusEndSoundPath { get; set; } = "";
 
+    /// <summary>After a focus session ends, ask what was achieved and log it as a RescueTime highlight.</summary>
+    public bool PromptForAchievement { get; set; } = true;
+
     /// <summary>Periodically remind (during work hours) to start a focus session if none is running.</summary>
     public bool EnableFocusReminders { get; set; } = true;
 

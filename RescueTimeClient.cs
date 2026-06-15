@@ -151,6 +151,20 @@ public sealed class RescueTimeClient : IDisposable
         return PostAsync(url, "End focus session", premiumHintOn400: false, ct);
     }
 
+    /// <summary>Posts a daily highlight (≤255 chars) for today, grouped under <paramref name="source"/>.</summary>
+    public Task PostHighlightAsync(string apiKey, string description, string source, CancellationToken ct = default)
+    {
+        string date = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        string text = description.Length > 255 ? description[..255] : description;
+        string url =
+            "https://www.rescuetime.com/anapi/highlights_post" +
+            "?key=" + Uri.EscapeDataString(apiKey) +
+            "&highlight_date=" + date +
+            "&description=" + Uri.EscapeDataString(text) +
+            "&source=" + Uri.EscapeDataString(source);
+        return PostAsync(url, "Save highlight", premiumHintOn400: true, ct);
+    }
+
     private async Task PostAsync(string url, string action, bool premiumHintOn400, CancellationToken ct)
     {
         HttpResponseMessage response;
