@@ -30,6 +30,8 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
     private int? _lastPulse;
     private double? _lastTotalSeconds;
     private DateTime? _lastUpdated;
+    private int _focusSessionsToday;
+    private double _focusSecondsToday;
 
     private ReminderForm? _reminderForm;
     private DateTime _lastReminderSlot = DateTime.MinValue;
@@ -393,8 +395,12 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
         _isReconciling = true;
         try
         {
-            FocusFeedState feed = await _client.GetFocusFeedStateAsync(_config.ApiKey);
-            switch (_focus.Reconcile(feed))
+            FocusInfo info = await _client.GetFocusAsync(_config.ApiKey);
+            _focusSessionsToday = info.Summary.SessionCount;
+            _focusSecondsToday = info.Summary.FocusedSeconds;
+
+            FocusReconcileResult result = _focus.Reconcile(info.State);
+            switch (result)
             {
                 case FocusReconcileResult.Adopted:
                     if (_config.ShowFocusNotifications)
@@ -414,6 +420,13 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
                         ShowBalloon("Focus session ended", "The session was ended from another device.", ToolTipIcon.Info);
                     }
                     break;
+            }
+
+            // Adopted/EndedEarly/Completed already raised StateChanged via the focus Changed event.
+            // Only raise here when state was unchanged but today's totals may have refreshed.
+            if (result == FocusReconcileResult.None)
+            {
+                RaiseStateChanged();
             }
         }
         catch
@@ -597,6 +610,8 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
     double IStatusController.FocusRemainingFraction => _focus.RemainingFraction;
     int IStatusController.FocusRequestedMinutes => _focus.RequestedMinutes;
     int IStatusController.DefaultFocusMinutes => _config.DefaultFocusMinutes;
+    int IStatusController.FocusSessionsToday => _focusSessionsToday;
+    double IStatusController.FocusSecondsToday => _focusSecondsToday;
 
     void IStatusController.StartDefaultFocus() => _ = StartFocusAsync(_config.DefaultFocusMinutes);
     void IStatusController.StopFocus() => _ = EndFocusAsync();

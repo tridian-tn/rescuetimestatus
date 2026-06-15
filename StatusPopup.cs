@@ -18,6 +18,8 @@ public interface IStatusController
     double FocusRemainingFraction { get; }
     int FocusRequestedMinutes { get; }
     int DefaultFocusMinutes { get; }
+    int FocusSessionsToday { get; }
+    double FocusSecondsToday { get; }
 
     void StartDefaultFocus();
     void StopFocus();
@@ -43,6 +45,7 @@ public sealed class StatusPopup : Form
     private readonly Label _pulseLabel = new();
     private readonly Label _captionLabel = new();
     private readonly Label _timeLabel = new();
+    private readonly Label _focusStatsLabel = new();
     private readonly Label _updatedLabel = new();
     private readonly Label _focusStatus = new();
     private readonly ProgressBar _progress = new();
@@ -96,7 +99,12 @@ public sealed class StatusPopup : Form
         _timeLabel.Font = new Font("Segoe UI", 10.5f);
         _timeLabel.Margin = new Padding(0, 0, 0, 1);
 
+        _focusStatsLabel.AutoSize = true;
+        _focusStatsLabel.ForeColor = Color.FromArgb(96, 96, 96);
+        _focusStatsLabel.Margin = new Padding(0, 0, 0, 2);
+
         _updatedLabel.AutoSize = true;
+        _updatedLabel.Font = new Font("Segoe UI", 8.25f);
         _updatedLabel.ForeColor = SystemColors.GrayText;
         _updatedLabel.Margin = new Padding(0, 0, 0, 4);
 
@@ -121,6 +129,7 @@ public sealed class StatusPopup : Form
         root.Controls.Add(_pulseLabel);
         root.Controls.Add(_captionLabel);
         root.Controls.Add(_timeLabel);
+        root.Controls.Add(_focusStatsLabel);
         root.Controls.Add(_updatedLabel);
         root.Controls.Add(Divider());
         root.Controls.Add(_focusStatus);
@@ -230,6 +239,17 @@ public sealed class StatusPopup : Form
         _timeLabel.Text = _controller.TotalSeconds.HasValue
             ? $"{FormatDuration(_controller.TotalSeconds.Value)} logged today"
             : "No time logged yet";
+
+        // Only show the focus tally once there's something to show, to avoid echoing the
+        // "No focus session running" line below when the day hasn't started.
+        int sessions = _controller.FocusSessionsToday;
+        _focusStatsLabel.Visible = sessions > 0;
+        if (sessions > 0)
+        {
+            _focusStatsLabel.Text =
+                $"{FormatDuration(_controller.FocusSecondsToday)} focused · {sessions} session{(sessions == 1 ? "" : "s")}";
+        }
+
         _updatedLabel.Text = _controller.LastUpdated.HasValue
             ? $"updated {_controller.LastUpdated.Value:HH:mm}"
             : "updating…";
