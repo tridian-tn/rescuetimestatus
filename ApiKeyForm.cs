@@ -255,20 +255,30 @@ public sealed class ApiKeyForm : Form
         {
             using var client = new RescueTimeClient();
             PulseSnapshot snap = await client.GetTodayAsync(key);
+            if (IsDisposed || !IsHandleCreated)
+            {
+                return;
+            }
             MessageBox.Show(this,
                 $"Success — RescueTime responded.\n\nToday's productivity pulse: {snap.Pulse}%.",
                 "API key works", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
-        catch (Exception ex)
+        catch (RescueTimeException ex)
         {
-            MessageBox.Show(this,
-                "Couldn't reach RescueTime with that key:\n\n" + ex.Message,
-                "Test failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            if (!IsDisposed && IsHandleCreated)
+            {
+                MessageBox.Show(this,
+                    "Test failed:\n\n" + ex.Message,
+                    "Test failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
         finally
         {
-            _testButton.Text = original;
-            _testButton.Enabled = true;
+            if (!IsDisposed && !_testButton.IsDisposed)
+            {
+                _testButton.Text = original;
+                _testButton.Enabled = true;
+            }
         }
     }
 
