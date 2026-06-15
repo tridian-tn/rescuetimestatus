@@ -30,6 +30,8 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
     private int? _lastPulse;
     private double? _lastTotalSeconds;
     private DateTime? _lastUpdated;
+    private int _focusSessionsToday;
+    private double _focusSecondsToday;
 
     private ReminderForm? _reminderForm;
     private DateTime _lastReminderSlot = DateTime.MinValue;
@@ -393,8 +395,11 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
         _isReconciling = true;
         try
         {
-            FocusFeedState feed = await _client.GetFocusFeedStateAsync(_config.ApiKey);
-            switch (_focus.Reconcile(feed))
+            FocusInfo info = await _client.GetFocusAsync(_config.ApiKey);
+            _focusSessionsToday = info.Summary.SessionCount;
+            _focusSecondsToday = info.Summary.FocusedSeconds;
+
+            switch (_focus.Reconcile(info.State))
             {
                 case FocusReconcileResult.Adopted:
                     if (_config.ShowFocusNotifications)
@@ -415,6 +420,9 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
                     }
                     break;
             }
+
+            // Surface refreshed today's-focus totals to the flyout, even when state didn't change.
+            RaiseStateChanged();
         }
         catch
         {
@@ -597,6 +605,8 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
     double IStatusController.FocusRemainingFraction => _focus.RemainingFraction;
     int IStatusController.FocusRequestedMinutes => _focus.RequestedMinutes;
     int IStatusController.DefaultFocusMinutes => _config.DefaultFocusMinutes;
+    int IStatusController.FocusSessionsToday => _focusSessionsToday;
+    double IStatusController.FocusSecondsToday => _focusSecondsToday;
 
     void IStatusController.StartDefaultFocus() => _ = StartFocusAsync(_config.DefaultFocusMinutes);
     void IStatusController.StopFocus() => _ = EndFocusAsync();

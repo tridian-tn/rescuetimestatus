@@ -17,7 +17,8 @@ The tooltip reads, e.g.: `Pulse 82%  •  5h 23m logged today  (14:05)`.
 
 A single left-click on the tray icon opens a small flyout near the tray showing:
 
-- Today's **productivity pulse** (color-coded) and **time logged**, with the last-updated time.
+- Today's **productivity pulse** (color-coded), **time logged**, and — once you've focused —
+  **time focused** and the **number of focus sessions** today, with the last-updated time.
 - **Focus controls** that match the current state:
   - *Idle* → a **Start focus · N min** button (uses the default length).
   - *Running* → time remaining, a progress bar, and **Stop** / **Restart** buttons.

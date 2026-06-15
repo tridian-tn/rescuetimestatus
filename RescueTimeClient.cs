@@ -15,6 +15,12 @@ public sealed record PulseSnapshot(int Pulse, double TotalSeconds, DateTime Retr
 /// <summary>The latest start/end derived from the focus-session feeds.</summary>
 public sealed record FocusFeedState(DateTime? StartedAt, int DurationMinutes, DateTime? EndedAt);
 
+/// <summary>Today's focus totals derived from the feeds.</summary>
+public sealed record FocusDaySummary(int SessionCount, double FocusedSeconds);
+
+/// <summary>Combined focus-feed result: latest start/end (for reconciliation) plus today's totals.</summary>
+public sealed record FocusInfo(FocusFeedState State, FocusDaySummary Summary);
+
 public sealed class RescueTimeException : Exception
 {
     public RescueTimeException(string message) : base(message) { }
@@ -184,16 +190,72 @@ public sealed class RescueTimeClient : IDisposable
         }
     }
 
-    /// <summary>Reads the started/ended focus feeds and reduces them to the latest start + latest end.</summary>
-    public async Task<FocusFeedState> GetFocusFeedStateAsync(string apiKey, CancellationToken ct = default)
+    /// <summary>
+    /// Reads the started/ended focus feeds once and derives both the latest start/end (for
+    /// reconciliation) and today's totals (session count + focused time).
+    /// </summary>
+    public async Task<FocusInfo> GetFocusAsync(string apiKey, CancellationToken ct = default)
     {
         List<FocusFeedEntry> started = await GetFeedAsync(apiKey, "focustime_started_feed", ct).ConfigureAwait(false);
         List<FocusFeedEntry> ended = await GetFeedAsync(apiKey, "focustime_ended_feed", ct).ConfigureAwait(false);
 
         FocusFeedEntry? latestStart = Latest(started);
         FocusFeedEntry? latestEnd = Latest(ended);
+        var state = new FocusFeedState(latestStart?.Time, latestStart?.DurationMinutes ?? 0, latestEnd?.Time);
 
-        return new FocusFeedState(latestStart?.Time, latestStart?.DurationMinutes ?? 0, latestEnd?.Time);
+        return new FocusInfo(state, ComputeDaySummary(started, ended));
+    }
+
+    /// <summary>
+    /// Counts focus sessions started today and sums their focused time. Sessions don't overlap,
+    /// so the start/end events alternate: we pair each start with the next end (and use "now" for
+    /// a still-running session). Only sessions that started today are counted.
+    /// </summary>
+    private static FocusDaySummary ComputeDaySummary(List<FocusFeedEntry> started, List<FocusFeedEntry> ended)
+    {
+        DateTime today = DateTime.Today;
+        DateTime now = DateTime.Now;
+
+        int count = 0;
+        foreach (FocusFeedEntry s in started)
+        {
+            if (s.Time.Date == today)
+            {
+                count++;
+            }
+        }
+
+        // Merge starts and ends into one time-ordered stream (starts before ends at equal times).
+        var events = new List<(DateTime time, bool isStart)>(started.Count + ended.Count);
+        foreach (FocusFeedEntry s in started) events.Add((s.Time, true));
+        foreach (FocusFeedEntry e in ended) events.Add((e.Time, false));
+        events.Sort((a, b) => a.time != b.time ? a.time.CompareTo(b.time) : (b.isStart ? 1 : -1));
+
+        double focused = 0;
+        DateTime? open = null;
+        foreach ((DateTime time, bool isStart) in events)
+        {
+            if (isStart)
+            {
+                open = time;
+            }
+            else if (open is DateTime start)
+            {
+                if (start.Date == today)
+                {
+                    focused += Math.Max(0, (time - start).TotalSeconds);
+                }
+                open = null;
+            }
+        }
+
+        // A session still running at the end of the stream counts up to now.
+        if (open is DateTime active && active.Date == today)
+        {
+            focused += Math.Max(0, (now - active).TotalSeconds);
+        }
+
+        return new FocusDaySummary(count, focused);
     }
 
     private static FocusFeedEntry? Latest(List<FocusFeedEntry> entries)
