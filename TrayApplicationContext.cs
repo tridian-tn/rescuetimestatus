@@ -463,8 +463,14 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
 
         // base × 2^(failures-1): the first failure retries at the normal cadence, then doubles.
         int exponent = Math.Min(_consecutiveFailures - 1, 16); // 16 keeps the shift well within long
-        long scaled = Math.Min((long)baseMs << exponent, cap);
+        if (exponent == 0)
+        {
+            return baseMs; // first failure: retry at exactly the configured cadence (no jitter)
+        }
 
+        // Jitter only once we're actually backing off, so clients recovering from a shared
+        // outage don't retry in lockstep. The downward half can't dip below base.
+        long scaled = Math.Min((long)baseMs << exponent, cap);
         double jittered = scaled * (0.9 + Random.Shared.NextDouble() * 0.2);
         return (int)Math.Clamp(jittered, baseMs, (double)cap);
     }
