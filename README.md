@@ -41,6 +41,11 @@ When a session finishes, you get a **balloon/toast notification** and a **sound*
 configurable). Focus Sessions are a **RescueTime Premium** feature — on the free plan the
 start call fails and the app shows a notification saying so.
 
+When a session ends (completed or stopped), the app asks **"What did you get done?"** — if you
+enter something it's posted to RescueTime as a **daily highlight** (grouped under a "Focus
+session" source), so it shows up in your dashboard. Leave it blank to skip; toggle the prompt in
+Settings. (Highlights are also Premium-only.)
+
 ### Feed reconciliation
 
 The app polls the `focustime_started_feed` / `focustime_ended_feed` endpoints (alongside each
@@ -127,6 +132,7 @@ Stored in `%APPDATA%\RescueTimeStatus\config.json`:
 | `ShowFocusNotifications` | true | Toast on focus start/end |
 | `PlayFocusEndSound` | true | Sound when a session finishes |
 | `FocusEndSoundPath` | "" | Custom `.wav` (empty = Windows system sound) |
+| `PromptForAchievement` | true | Ask what you got done after a session and log it as a highlight |
 | `EnableFocusReminders` | true | Nudge to start a session during work hours |
 | `ReminderIntervalMinutes` | 60 | Reminder cadence, aligned to `WorkdayStart` |
 | `WorkdayStart` / `WorkdayEnd` | "09:00" / "17:00" | Work-hours window for reminders |
@@ -150,6 +156,7 @@ The result lands in `bin/Release/net8.0-windows/win-x64/publish/RescueTimeStatus
 - `TrayIconRenderer.cs` — draws the number + countdown ring onto the icon
 - `ReminderSchedule.cs` — pure work-hours / reminder-slot logic
 - `ReminderForm.cs` — the persistent "time to focus?" popup
+- `AchievementForm.cs` — the end-of-session "what did you get done?" prompt
 - `StatusPopup.cs` — the single-click status flyout (`IStatusController` + the form)
 - `ApiKeyForm.cs` — first-run / settings dialog
 - `AppConfig.cs` — JSON settings in `%APPDATA%`

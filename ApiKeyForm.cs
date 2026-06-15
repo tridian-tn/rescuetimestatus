@@ -19,6 +19,7 @@ public sealed class ApiKeyForm : Form
     private readonly CheckBox _notifyCheck;
     private readonly CheckBox _soundCheck;
     private readonly TextBox _soundPathBox;
+    private readonly CheckBox _achievementCheck;
     private readonly CheckBox _remindCheck;
     private readonly NumericUpDown _intervalBox;
     private readonly DateTimePicker _workStartPicker;
@@ -31,6 +32,7 @@ public sealed class ApiKeyForm : Form
     public bool ShowFocusNotifications => _notifyCheck.Checked;
     public bool PlayFocusEndSound => _soundCheck.Checked;
     public string FocusEndSoundPath => _soundPathBox.Text.Trim();
+    public bool PromptForAchievement => _achievementCheck.Checked;
     public bool EnableFocusReminders => _remindCheck.Checked;
     public int ReminderIntervalMinutes => (int)_intervalBox.Value;
     public string WorkdayStart => _workStartPicker.Value.ToString("HH:mm");
@@ -75,6 +77,8 @@ public sealed class ApiKeyForm : Form
         var browseButton = new Button { Text = "Browse…", AutoSize = false, Size = new Size(84, 28), Margin = new Padding(8, 0, 0, 0) };
         browseButton.Click += (_, _) => BrowseForSound();
 
+        _achievementCheck = Check("Ask what I got done after each session (logs a RescueTime highlight)", config.PromptForAchievement);
+
         _remindCheck = Check("Remind me to start a focus session during work hours", config.EnableFocusReminders);
         _intervalBox = Spin(config.ReminderIntervalMinutes, 5, 480, 5);
 
@@ -116,6 +120,7 @@ public sealed class ApiKeyForm : Form
         root.Controls.Add(_soundCheck);
         root.Controls.Add(Label("Custom end sound (.wav, optional):"));
         root.Controls.Add(Row(_soundPathBox, browseButton));
+        root.Controls.Add(_achievementCheck);
         root.Controls.Add(Divider());
         root.Controls.Add(Heading("Focus reminders"));
         root.Controls.Add(_remindCheck);

@@ -40,6 +40,7 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
     private StatusPopup? _popup;
     private DateTime _popupHiddenAt = DateTime.MinValue;
     private Action? _stateChanged;
+    private AchievementForm? _achievementForm;
 
     public TrayApplicationContext()
     {
@@ -173,6 +174,7 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
             {
                 ShowBalloon("Focus session ended", "You ended the session early.", ToolTipIcon.Info);
             }
+            PromptAchievement("Focus session ended");
         }
         catch (Exception ex)
         {
@@ -215,6 +217,45 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
         UpdateTooltip();
         RaiseStateChanged();
         NotifyCompleted();
+        PromptAchievement("Focus session complete");
+    }
+
+    // Ask what was achieved; if the user enters text, log it to RescueTime as a highlight.
+    private void PromptAchievement(string title)
+    {
+        if (!_config.PromptForAchievement || string.IsNullOrWhiteSpace(_config.ApiKey))
+        {
+            return;
+        }
+
+        if (_achievementForm is { IsDisposed: false } existing)
+        {
+            existing.Activate();
+            return;
+        }
+
+        var form = new AchievementForm(title, "Anything you note is saved to RescueTime as a highlight.");
+        form.Saved += text => _ = SaveHighlightAsync(text);
+        form.FormClosed += (_, _) => _achievementForm = null;
+        _achievementForm = form;
+        form.Show();
+        form.Activate();
+    }
+
+    private async Task SaveHighlightAsync(string text)
+    {
+        try
+        {
+            await _client.PostHighlightAsync(_config.ApiKey, text, "Focus session");
+            if (_config.ShowFocusNotifications)
+            {
+                ShowBalloon("Highlight saved", text.Length > 60 ? text[..57] + "…" : text, ToolTipIcon.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowBalloon("Couldn't save highlight", ex.Message, ToolTipIcon.Warning);
+        }
     }
 
     private async Task RestartFocusAsync()
@@ -490,6 +531,7 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
         _config.ShowFocusNotifications = form.ShowFocusNotifications;
         _config.PlayFocusEndSound = form.PlayFocusEndSound;
         _config.FocusEndSoundPath = form.FocusEndSoundPath;
+        _config.PromptForAchievement = form.PromptForAchievement;
         _config.EnableFocusReminders = form.EnableFocusReminders;
         _config.ReminderIntervalMinutes = form.ReminderIntervalMinutes;
         _config.WorkdayStart = form.WorkdayStart;
@@ -635,6 +677,7 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
             _reminderTimer.Dispose();
             _reminderForm?.Dispose();
             _popup?.Dispose();
+            _achievementForm?.Dispose();
             _focus.Dispose();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
