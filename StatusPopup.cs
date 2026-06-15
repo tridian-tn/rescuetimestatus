@@ -38,6 +38,7 @@ public sealed class StatusPopup : Form
     private const int ContentWidth = 224;
 
     private readonly IStatusController _controller;
+    private Point _anchor; // tray-click location captured when the flyout is shown
 
     private readonly Label _pulseLabel = new();
     private readonly Label _captionLabel = new();
@@ -188,15 +189,28 @@ public sealed class StatusPopup : Form
     public void ShowNearTray()
     {
         UpdateView();
+        _anchor = Cursor.Position; // the tray-click location
         PositionNearTray();
         Show();
         Activate();
     }
 
+    // Anchor the flyout to the tray-click point on whichever monitor it happened, clamped to that
+    // monitor's working area. Defaults to up-and-left of the click (typical bottom-right tray) and
+    // flips/clamps for taskbars on other edges or secondary monitors.
     private void PositionNearTray()
     {
-        Rectangle area = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1024, 768);
-        Location = new Point(area.Right - Width - 12, area.Bottom - Height - 12);
+        Rectangle wa = Screen.FromPoint(_anchor).WorkingArea;
+        const int margin = 4;
+
+        int x = _anchor.X - Width;
+        int y = _anchor.Y - Height - margin;
+        if (x < wa.Left) x = _anchor.X + margin;   // taskbar/tray on the left edge
+        if (y < wa.Top) y = _anchor.Y + margin;    // taskbar/tray on the top edge
+
+        x = Math.Clamp(x, wa.Left, Math.Max(wa.Left, wa.Right - Width));
+        y = Math.Clamp(y, wa.Top, Math.Max(wa.Top, wa.Bottom - Height));
+        Location = new Point(x, y);
     }
 
     private void OnStateChanged()
@@ -260,6 +274,18 @@ public sealed class StatusPopup : Form
 
     private static string FormatClock(TimeSpan ts) =>
         ts.TotalHours >= 1 ? $"{(int)ts.TotalHours}:{ts.Minutes:00}:{ts.Seconds:00}" : $"{ts.Minutes}:{ts.Seconds:00}";
+
+    // A user close (e.g. Alt+F4) just hides the flyout — it's reused, and only disposed at app exit.
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (e.CloseReason == CloseReason.UserClosing)
+        {
+            e.Cancel = true;
+            Hide();
+            return;
+        }
+        base.OnFormClosing(e);
+    }
 
     protected override void Dispose(bool disposing)
     {

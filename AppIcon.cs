@@ -23,7 +23,10 @@ public static class AppIcon
                 try
                 {
                     string exe = Environment.ProcessPath ?? Application.ExecutablePath;
-                    _icon = Icon.ExtractAssociatedIcon(exe);
+                    // ExtractAssociatedIcon owns a GDI handle; clone a managed copy and free the
+                    // original rather than holding the extracted handle for the app's lifetime.
+                    using Icon? extracted = Icon.ExtractAssociatedIcon(exe);
+                    _icon = extracted is null ? null : (Icon)extracted.Clone();
                 }
                 catch
                 {

@@ -556,7 +556,7 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
 
     private void TogglePopup()
     {
-        if (_popup is { Visible: true })
+        if (_popup is { IsDisposed: false, Visible: true })
         {
             _popup.Hide();
             return;
@@ -568,7 +568,11 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
             return;
         }
 
-        _popup ??= CreatePopup();
+        // Recreate if it was never created or got disposed (a user close, e.g. Alt+F4).
+        if (_popup is null || _popup.IsDisposed)
+        {
+            _popup = CreatePopup();
+        }
         _popup.ShowNearTray();
     }
 
