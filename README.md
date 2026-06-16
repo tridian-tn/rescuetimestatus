@@ -91,6 +91,11 @@ levels (very distracting → very productive mapped to 0 → 100). Total logged 
 of all seconds returned. Computing it live means the number reflects **today so far**, not
 just finalized past days.
 
+If a refresh fails (network down, RescueTime outage or throttling), the poll **backs off
+exponentially** — the interval doubles each consecutive failure (base → 2× → 4× …), capped at
+30 minutes and lightly jittered, then snaps back to your configured interval on the first
+success. So a temporary outage won't keep hammering the API.
+
 ## Requirements
 
 - Windows 10/11
