@@ -1,11 +1,11 @@
 # RescueTime Status
 
 A lightweight Windows system-tray app that shows your **RescueTime Productivity Pulse**
-as a number on the tray icon, color-coded by how your day is going. Hover the icon to see
+as a number on the tray icon, colour-coded by how your day is going. Hover the icon to see
 the pulse and **time logged today**, **single-click** for a status flyout with focus controls,
 and right-click to **start/stop a Focus Session**.
 
-| Icon color | Pulse  | Meaning            |
+| Icon colour | Pulse  | Meaning            |
 |------------|--------|--------------------|
 | 🟢 Green   | 75–100 | Very productive    |
 | 🟠 Amber   | 50–74  | Mixed              |
@@ -17,7 +17,7 @@ The tooltip reads, e.g.: `Pulse 82%  •  5h 23m logged today  (14:05)`.
 
 A single left-click on the tray icon opens a small flyout near the tray showing:
 
-- Today's **productivity pulse** (color-coded), **time logged**, and — once you've focused —
+- Today's **productivity pulse** (colour-coded), **time logged**, and — once you've focused —
   **time focused** and the **number of focus sessions** today, with the last-updated time.
 - **Focus controls** that match the current state:
   - *Idle* → a **Start focus · N min** button (uses the default length).
@@ -33,7 +33,7 @@ Right-click → **Start focus session** (pick a length, or *Until end of day*), 
 **Start default** for the configured default length. While a session runs:
 
 - A **blue countdown ring** is drawn on top of the badge — it depletes as the session counts
-  down, so the icon doubles as a timer. The pulse color and number stay fully visible.
+  down, so the icon doubles as a timer. The pulse colour and number stay fully visible.
 - The tooltip shows time remaining, e.g. `Focus 12:34 left  •  Pulse 82%`.
 - Right-click → **End focus session** stops it early.
 
