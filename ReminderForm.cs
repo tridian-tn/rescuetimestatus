@@ -49,21 +49,21 @@ public sealed class ReminderForm : Form
             Margin = new Padding(0, 0, 0, 14),
         };
 
-        var startButton = Button($"Start {defaultFocusMinutes} min");
+        var startButton = CreateButton($"Start {defaultFocusMinutes} min");
         startButton.Click += (_, _) =>
         {
             StartRequested?.Invoke(defaultFocusMinutes);
             Close();
         };
 
-        var snoozeButton = Button($"Snooze {SnoozeMinutes}m");
+        var snoozeButton = CreateButton($"Snooze {SnoozeMinutes}m");
         snoozeButton.Click += (_, _) =>
         {
             Snoozed?.Invoke(SnoozeMinutes);
             Close();
         };
 
-        var dismissButton = Button("Dismiss");
+        var dismissButton = CreateButton("Dismiss");
         dismissButton.Margin = new Padding(0); // last button: no trailing gap
         dismissButton.Click += (_, _) => Close();
 
@@ -97,7 +97,7 @@ public sealed class ReminderForm : Form
 
     // Auto-sizing button with a comfortable minimum height and horizontal padding so the
     // label (e.g. "Snooze 10m") is never clipped, whatever the DPI.
-    private static Button Button(string text) => new()
+    private static Button CreateButton(string text) => new()
     {
         Text = text,
         AutoSize = true,

@@ -57,7 +57,7 @@ public sealed class AchievementForm : Form
             Margin = new Padding(0, 0, 0, 12),
         };
 
-        var saveButton = Button("Save highlight");
+        var saveButton = CreateButton("Save highlight");
         saveButton.Click += (_, _) =>
         {
             string text = _input.Text.Trim();
@@ -68,7 +68,7 @@ public sealed class AchievementForm : Form
             Close();
         };
 
-        var skipButton = Button("Skip");
+        var skipButton = CreateButton("Skip");
         skipButton.Margin = new Padding(0); // last button: no trailing gap
         skipButton.Click += (_, _) => Close();
 
@@ -101,7 +101,7 @@ public sealed class AchievementForm : Form
         CancelButton = skipButton;
     }
 
-    private static Button Button(string text) => new()
+    private static Button CreateButton(string text) => new()
     {
         Text = text,
         AutoSize = true,
