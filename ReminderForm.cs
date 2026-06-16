@@ -7,6 +7,7 @@ namespace RescueTimeStatus;
 /// <summary>
 /// A small top-most reminder popup that stays on screen until the user acts on it
 /// (Windows toast balloons can't guarantee "stays until dismissed").
+/// Laid out with TableLayoutPanel/FlowLayoutPanel so nothing clips or overlaps at non-100% DPI.
 /// </summary>
 public sealed class ReminderForm : Form
 {
@@ -26,62 +27,90 @@ public sealed class ReminderForm : Form
         ShowInTaskbar = false;
         TopMost = true;
         Icon = AppIcon.Value;
-        ClientSize = new Size(320, 146);
         Font = new Font("Segoe UI", 9f);
+        AutoScaleMode = AutoScaleMode.Font;
+        AutoScaleDimensions = new SizeF(7f, 15f);
+        AutoSize = true;
+        AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
         var heading = new Label
         {
             Text = "Time to focus?",
-            Location = new Point(16, 14),
             AutoSize = true,
             Font = new Font("Segoe UI", 11f, FontStyle.Bold),
+            Margin = new Padding(0, 0, 0, 4),
         };
 
         var message = new Label
         {
             Text = "No focus session is running. Start one to stay on track.",
-            Location = new Point(16, 42),
-            Size = new Size(290, 36),
+            AutoSize = true,
+            MaximumSize = new Size(290, 0), // wrap at 290px, grow vertically instead of truncating
+            Margin = new Padding(0, 0, 0, 14),
         };
 
-        var startButton = new Button
-        {
-            Text = $"Start {defaultFocusMinutes} min",
-            Location = new Point(16, 100),
-            Width = 110,
-        };
+        var startButton = Button($"Start {defaultFocusMinutes} min");
         startButton.Click += (_, _) =>
         {
             StartRequested?.Invoke(defaultFocusMinutes);
             Close();
         };
 
-        var snoozeButton = new Button
-        {
-            Text = $"Snooze {SnoozeMinutes}m",
-            Location = new Point(134, 100),
-            Width = 90,
-        };
+        var snoozeButton = Button($"Snooze {SnoozeMinutes}m");
         snoozeButton.Click += (_, _) =>
         {
             Snoozed?.Invoke(SnoozeMinutes);
             Close();
         };
 
-        var dismissButton = new Button
-        {
-            Text = "Dismiss",
-            Location = new Point(232, 100),
-            Width = 74,
-        };
+        var dismissButton = Button("Dismiss");
+        dismissButton.Margin = new Padding(0); // last button: no trailing gap
         dismissButton.Click += (_, _) => Close();
 
-        Controls.AddRange(new Control[] { heading, message, startButton, snoozeButton, dismissButton });
+        var buttons = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new Padding(0),
+        };
+        buttons.Controls.AddRange(new Control[] { startButton, snoozeButton, dismissButton });
+
+        var root = new TableLayoutPanel
+        {
+            ColumnCount = 1,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Padding = new Padding(16, 14, 16, 14),
+            GrowStyle = TableLayoutPanelGrowStyle.AddRows,
+        };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        root.Controls.Add(heading);
+        root.Controls.Add(message);
+        root.Controls.Add(buttons);
+
+        Controls.Add(root);
 
         AcceptButton = startButton;
         CancelButton = dismissButton;
+    }
 
-        PositionBottomRight();
+    // Auto-sizing button with a comfortable minimum height and horizontal padding so the
+    // label (e.g. "Snooze 10m") is never clipped, whatever the DPI.
+    private static Button Button(string text) => new()
+    {
+        Text = text,
+        AutoSize = true,
+        AutoSizeMode = AutoSizeMode.GrowAndShrink,
+        MinimumSize = new Size(80, 30),
+        Padding = new Padding(8, 0, 8, 0),
+        Margin = new Padding(0, 0, 8, 0),
+    };
+
+    protected override void OnLoad(EventArgs e)
+    {
+        base.OnLoad(e);
+        PositionBottomRight(); // after auto-size + DPI scaling, so Width/Height are final
     }
 
     private void PositionBottomRight()

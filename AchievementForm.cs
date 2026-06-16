@@ -7,9 +7,12 @@ namespace RescueTimeStatus;
 /// <summary>
 /// Shown when a focus session ends: asks what the user got done. If they enter text and save,
 /// it's posted to RescueTime as a daily highlight. Stays until the user acts on it.
+/// Laid out with TableLayoutPanel/FlowLayoutPanel so nothing clips or overlaps at non-100% DPI.
 /// </summary>
 public sealed class AchievementForm : Form
 {
+    private const int ContentWidth = 308;
+
     private readonly TextBox _input;
 
     /// <summary>Raised with the (non-empty, trimmed) text when the user saves.</summary>
@@ -23,34 +26,38 @@ public sealed class AchievementForm : Form
         ShowInTaskbar = false;
         TopMost = true;
         Icon = AppIcon.Value;
-        ClientSize = new Size(340, 150);
         Font = new Font("Segoe UI", 9f);
+        AutoScaleMode = AutoScaleMode.Font;
+        AutoScaleDimensions = new SizeF(7f, 15f);
+        AutoSize = true;
+        AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
         var heading = new Label
         {
             Text = "What did you get done?",
-            Location = new Point(16, 14),
             AutoSize = true,
             Font = new Font("Segoe UI", 11f, FontStyle.Bold),
+            Margin = new Padding(0, 0, 0, 4),
         };
 
         var sub = new Label
         {
             Text = subtitle,
-            Location = new Point(16, 40),
-            Size = new Size(308, 20),
+            AutoSize = true,
+            MaximumSize = new Size(ContentWidth, 0), // wrap, grow vertically instead of truncating
             ForeColor = SystemColors.GrayText,
+            Margin = new Padding(0, 0, 0, 8),
         };
 
         _input = new TextBox
         {
-            Location = new Point(16, 64),
-            Width = 308,
+            Width = ContentWidth,
             MaxLength = 255,
             PlaceholderText = "e.g. Drafted the Q3 report",
+            Margin = new Padding(0, 0, 0, 12),
         };
 
-        var saveButton = new Button { Text = "Save highlight", Location = new Point(16, 104), Width = 130 };
+        var saveButton = Button("Save highlight");
         saveButton.Click += (_, _) =>
         {
             string text = _input.Text.Trim();
@@ -61,14 +68,53 @@ public sealed class AchievementForm : Form
             Close();
         };
 
-        var skipButton = new Button { Text = "Skip", Location = new Point(250, 104), Width = 74 };
+        var skipButton = Button("Skip");
+        skipButton.Margin = new Padding(0); // last button: no trailing gap
         skipButton.Click += (_, _) => Close();
 
-        Controls.AddRange(new Control[] { heading, sub, _input, saveButton, skipButton });
+        var buttons = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new Padding(0),
+        };
+        buttons.Controls.AddRange(new Control[] { saveButton, skipButton });
+
+        var root = new TableLayoutPanel
+        {
+            ColumnCount = 1,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Padding = new Padding(16, 14, 16, 14),
+            GrowStyle = TableLayoutPanelGrowStyle.AddRows,
+        };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        root.Controls.Add(heading);
+        root.Controls.Add(sub);
+        root.Controls.Add(_input);
+        root.Controls.Add(buttons);
+
+        Controls.Add(root);
+
         AcceptButton = saveButton;
         CancelButton = skipButton;
+    }
 
-        PositionBottomRight();
+    private static Button Button(string text) => new()
+    {
+        Text = text,
+        AutoSize = true,
+        AutoSizeMode = AutoSizeMode.GrowAndShrink,
+        MinimumSize = new Size(80, 30),
+        Padding = new Padding(8, 0, 8, 0),
+        Margin = new Padding(0, 0, 8, 0),
+    };
+
+    protected override void OnLoad(EventArgs e)
+    {
+        base.OnLoad(e);
+        PositionBottomRight(); // after auto-size + DPI scaling, so Width/Height are final
     }
 
     protected override void OnShown(EventArgs e)
