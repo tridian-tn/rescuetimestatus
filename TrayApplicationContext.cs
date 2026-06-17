@@ -136,6 +136,8 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
         }
 
         menu.Items.Add(new ToolStripSeparator());
+        var addHighlight = menu.Items.Add("Add highlight…", null, (_, _) => PromptAddHighlight());
+        addHighlight.Enabled = !string.IsNullOrWhiteSpace(_config.ApiKey); // needs a key to post
         menu.Items.Add("Refresh now", null, async (_, _) => await RefreshAsync());
         menu.Items.Add("Open RescueTime dashboard", null, (_, _) => OpenDashboard());
         menu.Items.Add(new ToolStripSeparator());
@@ -247,12 +249,40 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
         form.Activate();
     }
 
-    private async Task SaveHighlightAsync(string text)
+    // Manual highlight from the tray menu: type some text, post it to RescueTime as today's highlight.
+    private void PromptAddHighlight()
+    {
+        // The menu item is disabled without a key; guard anyway in case it's ever invoked elsewhere.
+        if (string.IsNullOrWhiteSpace(_config.ApiKey))
+        {
+            return;
+        }
+
+        // Shares the single highlight-dialog slot with the focus-completion prompt.
+        if (_achievementForm is { IsDisposed: false } existing)
+        {
+            existing.Activate();
+            return;
+        }
+
+        var form = new AchievementForm(
+            "Add highlight",
+            "It's saved to RescueTime as a highlight under today's date.",
+            heading: "Add a highlight",
+            cancelText: "Cancel");
+        form.Saved += text => _ = SaveHighlightAsync(text, "Manual", announce: true);
+        form.FormClosed += (_, _) => _achievementForm = null;
+        _achievementForm = form;
+        form.Show();
+        form.Activate();
+    }
+
+    private async Task SaveHighlightAsync(string text, string source = "Focus session", bool announce = false)
     {
         try
         {
-            await _client.PostHighlightAsync(_config.ApiKey, text, "Focus session");
-            if (_config.ShowFocusNotifications)
+            await _client.PostHighlightAsync(_config.ApiKey, text, source);
+            if (announce || _config.ShowFocusNotifications)
             {
                 ShowBalloon("Highlight saved", text.Length > 60 ? text[..57] + "…" : text, ToolTipIcon.Info);
             }
