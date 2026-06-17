@@ -99,8 +99,18 @@ success. So a temporary outage won't keep hammering the API.
 ## Requirements
 
 - Windows 10/11
-- [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) (only needed to
-  run the framework-dependent build; see "Self-contained" below to avoid it)
+- [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) — required to run the
+  released builds (they're framework-dependent). To produce a build that bundles the runtime
+  instead, see "Build a single-file, self-contained .exe" below.
+
+## Downloads
+
+Pushing a version tag publishes framework-dependent zips for **win-x64** and **win-arm64** to the
+[Releases](../../releases) page. Extract anywhere and run `RescueTimeStatus.exe` — the
+[.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) must be installed.
+
+> **win-arm64 is untested.** It builds and is published, but hasn't been run on an ARM device.
+> If you try it, let me know how it goes.
 
 ## Setup
 
