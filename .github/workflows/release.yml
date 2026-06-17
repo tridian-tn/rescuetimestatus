@@ -43,7 +43,7 @@ jobs:
       run: |
         TAG="${GITHUB_REF#refs/tags/}"     # e.g. v1.2.3 or v1.2.3-beta.1
         VERSION="${TAG#v}"                 # e.g. 1.2.3 or 1.2.3-beta.1
-        NUMERIC="${VERSION%%-*}"           # e.g. 1.2.3  (File/Assembly versions can't carry a suffix)
+        NUMERIC="${VERSION%%[-+]*}"        # e.g. 1.2.3  (strip any -prerelease / +build suffix; File/Assembly versions must be numeric)
         {
           echo "version=$VERSION"
           echo "numeric=$NUMERIC"
