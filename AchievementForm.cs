@@ -5,8 +5,9 @@ using System.Windows.Forms;
 namespace RescueTimeStatus;
 
 /// <summary>
-/// Shown when a focus session ends: asks what the user got done. If they enter text and save,
-/// it's posted to RescueTime as a daily highlight. Stays until the user acts on it.
+/// A small text-entry dialog whose contents are posted to RescueTime as a daily highlight.
+/// Used when a focus session ends ("What did you get done?") and for the manual "Add highlight"
+/// entry on the tray menu. Stays until the user acts on it.
 /// Laid out with TableLayoutPanel/FlowLayoutPanel so nothing clips or overlaps at non-100% DPI.
 /// </summary>
 public sealed class AchievementForm : Form
@@ -18,7 +19,8 @@ public sealed class AchievementForm : Form
     /// <summary>Raised with the (non-empty, trimmed) text when the user saves.</summary>
     public event Action<string>? Saved;
 
-    public AchievementForm(string title, string subtitle)
+    public AchievementForm(string title, string subtitle,
+        string heading = "What did you get done?", string cancelText = "Skip")
     {
         Text = title;
         FormBorderStyle = FormBorderStyle.FixedToolWindow;
@@ -32,9 +34,9 @@ public sealed class AchievementForm : Form
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
-        var heading = new Label
+        var headingLabel = new Label
         {
-            Text = "What did you get done?",
+            Text = heading,
             AutoSize = true,
             Font = new Font("Segoe UI", 11f, FontStyle.Bold),
             Margin = new Padding(0, 0, 0, 4),
@@ -68,7 +70,7 @@ public sealed class AchievementForm : Form
             Close();
         };
 
-        var skipButton = CreateButton("Skip");
+        var skipButton = CreateButton(cancelText);
         skipButton.Margin = new Padding(0); // last button: no trailing gap
         skipButton.Click += (_, _) => Close();
 
@@ -90,7 +92,7 @@ public sealed class AchievementForm : Form
             GrowStyle = TableLayoutPanelGrowStyle.AddRows,
         };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        root.Controls.Add(heading);
+        root.Controls.Add(headingLabel);
         root.Controls.Add(sub);
         root.Controls.Add(_input);
         root.Controls.Add(buttons);
