@@ -133,6 +133,7 @@ Pushing a version tag publishes framework-dependent zips for **win-x64** and **w
 - **Open RescueTime dashboard** — opens the web dashboard (also from the flyout footer)
 - **Settings…** — API key, refresh interval, default focus length, notifications & sound, reminders
 - **Start with Windows** — toggle launch at login (per-user `Run` registry key)
+- **About RescueTime Status…** — version (see [Versioning](#versioning)) and a link to the project
 - **Exit**
 
 ## Settings
@@ -162,6 +163,23 @@ dotnet publish -c Release -r win-x64 --self-contained \
 
 The result lands in `bin/Release/net8.0-windows/win-x64/publish/RescueTimeStatus.exe`.
 
+## Versioning
+
+The version is derived from git automatically at build time (`git describe`), so every build is
+traceable to a commit. It's shown in the **About RescueTime Status…** dialog on the tray menu.
+
+- A build of a commit tagged `vX.Y.Z` (i.e. a release) reports exactly **`X.Y.Z`**.
+- Any other build reports the nearest tag, commits since, and the short hash — e.g.
+  **`1.2.3-5-g1a2b3c4`** — or just the short hash when no tag is reachable yet. A modified working
+  tree adds a **`-dirty`** suffix.
+
+To cut a release, tag the commit and push the tag — the [release workflow](.github/workflows/release.yml)
+builds and publishes it:
+
+```bash
+git tag v1.2.3 && git push origin v1.2.3
+```
+
 ## Files
 
 - `Program.cs` — entry point + single-instance guard
@@ -174,7 +192,9 @@ The result lands in `bin/Release/net8.0-windows/win-x64/publish/RescueTimeStatus
 - `AchievementForm.cs` — the end-of-session "what did you get done?" prompt
 - `StatusPopup.cs` — the single-click status flyout (`IStatusController` + the form)
 - `ApiKeyForm.cs` — first-run / settings dialog
+- `AboutForm.cs` — the About dialog (version + project link)
 - `AppConfig.cs` — JSON settings in `%APPDATA%`
 - `StartupManager.cs` — launch-at-login toggle
 - `AppIcon.cs` — loads the app icon for dialog title bars
+- `AppVersion.cs` — reads the git-derived version stamped into the assembly
 - `app.ico` — application icon (taskbar / Explorer / Alt+Tab); a heartbeat "pulse" badge

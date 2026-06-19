@@ -150,6 +150,7 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
         menu.Items.Add(startup);
 
         menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("About RescueTime Status…", null, (_, _) => ShowAbout());
         menu.Items.Add("Exit", null, (_, _) => ExitThread());
     }
 
@@ -666,6 +667,12 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
         {
             // Best-effort.
         }
+    }
+
+    private static void ShowAbout()
+    {
+        using var form = new AboutForm();
+        form.ShowDialog();
     }
 
     private void ShowBalloon(string title, string text, ToolTipIcon icon)
