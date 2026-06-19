@@ -8,12 +8,56 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>RescueTimeStatus</AssemblyName>
     <RootNamespace>RescueTimeStatus</RootNamespace>
+    <!-- Fallback version used when no git version tag is reachable (see SetGitVersion below). -->
     <Version>1.0.0</Version>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <!-- A tray-only app: keep the console window hidden and don't flash a window on start -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- Icon shown for the .exe in Explorer, the taskbar, and Alt+Tab -->
     <ApplicationIcon>app.ico</ApplicationIcon>
+
+    <!-- Stamp the build from git by default. Release builds pass an explicit version derived
+         from the pushed tag (see .github/workflows/release.yml) and set UseGitVersion=false. -->
+    <UseGitVersion Condition="'$(UseGitVersion)' == ''">true</UseGitVersion>
+    <!-- We embed the short commit in InformationalVersion ourselves; don't let the SDK append
+         a second "+&lt;full-commit&gt;" suffix on top of it. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
+
+  <!--
+    Derive the version from git at build time so every build is traceable to a commit:
+      * On a commit tagged vX.Y.Z (a release), the version is exactly X.Y.Z.
+      * Otherwise it's the nearest tag, commits-since, and short hash (e.g. 1.2.3-5-g1a2b3c4),
+        or just the short hash when the repo has no tags yet (e.g. 1a2b3c4).
+      * "-dirty" is appended when the working tree has uncommitted changes.
+    The numeric File/Assembly versions (which must be purely numeric) come from the nearest
+    version tag, falling back to <Version> above when no version tag is reachable.
+    A no-op when git or the .git directory is absent (e.g. building from a source archive).
+  -->
+  <Target Name="SetGitVersion"
+          BeforeTargets="CoreGenerateAssemblyInfo;GetAssemblyVersion"
+          Condition="'$(UseGitVersion)' == 'true'">
+
+    <Exec Command="git describe --tags --always --dirty"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low"
+          ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_GitDescribe" />
+      <Output TaskParameter="ExitCode" PropertyName="_GitExitCode" />
+    </Exec>
+
+    <PropertyGroup Condition="'$(_GitExitCode)' == '0' and '$(_GitDescribe)' != ''">
+      <!-- Drop a leading "v" so the tag v1.2.3 displays as 1.2.3. -->
+      <_GitVersion>$(_GitDescribe.Trim().TrimStart('v'))</_GitVersion>
+      <InformationalVersion>$(_GitVersion)</InformationalVersion>
+
+      <!-- MAJOR.MINOR.PATCH from a reachable version tag; empty when the repo has no tags. -->
+      <_NumericVersion>$([System.Text.RegularExpressions.Regex]::Match($(_GitVersion), '^[0-9]+\.[0-9]+\.[0-9]+').Value)</_NumericVersion>
+      <FileVersion Condition="'$(_NumericVersion)' != ''">$(_NumericVersion).0</FileVersion>
+      <AssemblyVersion Condition="'$(_NumericVersion)' != ''">$(_NumericVersion).0</AssemblyVersion>
+    </PropertyGroup>
+
+    <Message Importance="high" Text="Git version: $(InformationalVersion)" Condition="'$(InformationalVersion)' != ''" />
+  </Target>
 
 </Project>
