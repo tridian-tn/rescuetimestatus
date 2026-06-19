@@ -15,6 +15,10 @@ public sealed class AboutForm : Form
     private const string RepoUrl = "https://github.com/tridian-tn/RescueTimeStatus";
     private const int ContentWidth = 300;
 
+    // ToBitmap() allocates a new bitmap each time; a PictureBox doesn't dispose its Image, so we
+    // own it and free it in Dispose to avoid leaking a GDI handle each time the dialog is opened.
+    private readonly Bitmap _iconBitmap;
+
     public AboutForm()
     {
         Text = "About RescueTime Status";
@@ -30,9 +34,10 @@ public sealed class AboutForm : Form
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
+        _iconBitmap = (AppIcon.Value ?? SystemIcons.Application).ToBitmap();
         var iconBox = new PictureBox
         {
-            Image = (AppIcon.Value ?? SystemIcons.Application).ToBitmap(),
+            Image = _iconBitmap,
             SizeMode = PictureBoxSizeMode.Zoom,
             Size = new Size(48, 48),
             Margin = new Padding(0, 0, 0, 10),
@@ -115,5 +120,14 @@ public sealed class AboutForm : Form
         {
             // Best-effort, same as the dashboard link on the tray menu.
         }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _iconBitmap.Dispose();
+        }
+        base.Dispose(disposing);
     }
 }

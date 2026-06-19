@@ -32,13 +32,15 @@
       * "-dirty" is appended when the working tree has uncommitted changes.
     The numeric File/Assembly versions (which must be purely numeric) come from the nearest
     version tag, falling back to <Version> above when no version tag is reachable.
-    A no-op when git or the .git directory is absent (e.g. building from a source archive).
+    Skipped (so no git is invoked and no error is logged) when .git is absent — e.g. building
+    from a source archive; ContinueOnError additionally tolerates git not being installed.
   -->
   <Target Name="SetGitVersion"
           BeforeTargets="CoreGenerateAssemblyInfo;GetAssemblyVersion"
-          Condition="'$(UseGitVersion)' == 'true'">
+          Condition="'$(UseGitVersion)' == 'true' and Exists('$(MSBuildProjectDirectory)/.git')">
 
     <Exec Command="git describe --tags --always --dirty"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
           ConsoleToMSBuild="true"
           StandardOutputImportance="low"
           ContinueOnError="true">
