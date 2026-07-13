@@ -22,6 +22,7 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
     private readonly System.Windows.Forms.Timer _timer;
     private readonly System.Windows.Forms.Timer _focusPollTimer;
     private readonly System.Windows.Forms.Timer _reminderTimer;
+    private readonly System.Windows.Forms.Timer _diagTimer;
     private readonly RescueTimeClient _client = new();
     private readonly FocusSessionManager _focus;
     private readonly AppConfig _config;
@@ -82,6 +83,13 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
         // Work-hours reminders to start a focus session. Ticks often; self-gates on config/state.
         _reminderTimer = new System.Windows.Forms.Timer { Interval = 30_000 };
         _reminderTimer.Tick += (_, _) => CheckReminder();
+
+        // Leak diagnostics: sample process resource counters to diag.log every 5 minutes so a slow
+        // climb over hours is visible after the fact. Cheap; runs regardless of API-key state.
+        ResourceLog.Sample("startup");
+        _diagTimer = new System.Windows.Forms.Timer { Interval = 5 * 60_000 };
+        _diagTimer.Tick += (_, _) => ResourceLog.Sample("periodic");
+        _diagTimer.Start();
 
         if (string.IsNullOrWhiteSpace(_config.ApiKey))
         {
@@ -776,6 +784,7 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
             _timer.Dispose();
             _focusPollTimer.Dispose();
             _reminderTimer.Dispose();
+            _diagTimer.Dispose();
             _reminderForm?.Dispose();
             _popup?.Dispose();
             _achievementForm?.Dispose();
