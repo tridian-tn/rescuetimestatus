@@ -112,7 +112,15 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
 
     private void PopulateMenu(ContextMenuStrip menu)
     {
-        menu.Items.Clear();
+        // Dispose the previous items rather than just detaching them: ToolStripItemCollection.Clear()
+        // removes without disposing, so the discarded items (and the "Start focus session" submenu's
+        // ToolStripDropDown) leak USER/GDI handles every time the menu is rebuilt on open.
+        for (int i = menu.Items.Count - 1; i >= 0; i--)
+        {
+            ToolStripItem item = menu.Items[i];
+            menu.Items.RemoveAt(i);
+            item.Dispose();
+        }
 
         if (_focus.IsActive)
         {
