@@ -18,11 +18,15 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
     // up to this cap, then snaps back to normal on the next success.
     private const int MaxBackoffMs = 30 * 60_000;
 
+    // How often to force a collection so finalizers run and release accumulated OS handles.
+    private const int MaintenanceIntervalMs = 15 * 60_000;
+
     private readonly NotifyIcon _notifyIcon;
     private readonly System.Windows.Forms.Timer _timer;
     private readonly System.Windows.Forms.Timer _focusPollTimer;
     private readonly System.Windows.Forms.Timer _reminderTimer;
     private readonly System.Windows.Forms.Timer _diagTimer;
+    private readonly System.Windows.Forms.Timer _maintenanceTimer;
     private readonly RescueTimeClient _client = new();
     private readonly FocusSessionManager _focus;
     private readonly AppConfig _config;
@@ -90,6 +94,15 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
         _diagTimer = new System.Windows.Forms.Timer { Interval = 5 * 60_000 };
         _diagTimer.Tick += (_, _) => ResourceLog.Sample("periodic");
         _diagTimer.Start();
+
+        // This app allocates so little that an organic gen2 GC almost never fires, so the finalizers
+        // that release OS handles wrapped by framework HTTP/TLS objects never run — handles then
+        // climb without bound until the process exhausts them (surfacing as OutOfMemoryException).
+        // A periodic collection forces those finalizers to run and reclaims the handles. The live
+        // heap is well under 1 MB, so the pause is negligible.
+        _maintenanceTimer = new System.Windows.Forms.Timer { Interval = MaintenanceIntervalMs };
+        _maintenanceTimer.Tick += (_, _) => RunMaintenance();
+        _maintenanceTimer.Start();
 
         if (string.IsNullOrWhiteSpace(_config.ApiKey))
         {
@@ -753,6 +766,16 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
 
     private void RaiseStateChanged() => _stateChanged?.Invoke();
 
+    // Force finalizers to run so OS handles held by discarded framework objects are released, then
+    // reclaim the finalized objects. Runs on the UI thread, but the heap is tiny so it's sub-ms.
+    private static void RunMaintenance()
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        ResourceLog.Sample("post-gc");
+    }
+
     int? IStatusController.Pulse => _lastPulse;
     double? IStatusController.TotalSeconds => _lastTotalSeconds;
     DateTime? IStatusController.LastUpdated => _lastUpdated;
@@ -785,6 +808,7 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
             _focusPollTimer.Dispose();
             _reminderTimer.Dispose();
             _diagTimer.Dispose();
+            _maintenanceTimer.Dispose();
             _reminderForm?.Dispose();
             _popup?.Dispose();
             _achievementForm?.Dispose();
