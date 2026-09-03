@@ -18,10 +18,17 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
     // up to this cap, then snaps back to normal on the next success.
     private const int MaxBackoffMs = 30 * 60_000;
 
+    // How often to collect and hand the working set back to Windows. Nothing to do with handles —
+    // those stay flat — it's so an app that spends its life idle doesn't sit on tens of megabytes
+    // of resident memory just to show a number in the tray.
+    private const int TrimIntervalMs = 10 * 60_000;
+
     private readonly NotifyIcon _notifyIcon;
     private readonly System.Windows.Forms.Timer _timer;
     private readonly System.Windows.Forms.Timer _focusPollTimer;
     private readonly System.Windows.Forms.Timer _reminderTimer;
+    private readonly System.Windows.Forms.Timer _diagTimer;
+    private readonly System.Windows.Forms.Timer _trimTimer;
     private readonly RescueTimeClient _client = new();
     private readonly FocusSessionManager _focus;
     private readonly AppConfig _config;
@@ -31,6 +38,8 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
     private bool _isRefreshing;
     private bool _isReconciling;
     private int _consecutiveFailures;
+    private int _renderFailures;
+    private DateTime _lastRenderFailureLoggedAt = DateTime.MinValue;
 
     private int? _lastPulse;
     private double? _lastTotalSeconds;
@@ -83,6 +92,25 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
         _reminderTimer = new System.Windows.Forms.Timer { Interval = 30_000 };
         _reminderTimer.Tick += (_, _) => CheckReminder();
 
+        // Leak diagnostics: sample process resource counters to diag.log every 5 minutes so a slow
+        // climb over hours is visible after the fact. Cheap; runs regardless of API-key state.
+        ResourceLog.Sample("startup");
+        _diagTimer = new System.Windows.Forms.Timer { Interval = 5 * 60_000 };
+        _diagTimer.Tick += (_, _) => ResourceLog.Sample("periodic");
+        _diagTimer.Start();
+
+        // Off the UI thread: GC.WaitForPendingFinalizers() blocks the caller, and blocking the STA
+        // thread that finalizers may need to marshal to is how deadlocks happen. It isn't for
+        // responsiveness — the whole trim measures ~6 ms, and a collection suspends every managed
+        // thread whichever one starts it.
+        _trimTimer = new System.Windows.Forms.Timer { Interval = TrimIntervalMs };
+        _trimTimer.Tick += (_, _) => _ = Task.Run(() =>
+        {
+            MemoryTrim.Run();
+            ResourceLog.Sample("post-trim");
+        });
+        _trimTimer.Start();
+
         if (string.IsNullOrWhiteSpace(_config.ApiKey))
         {
             _notifyIcon.Text = "RescueTime Status — set your API key";
@@ -112,7 +140,16 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
 
     private void PopulateMenu(ContextMenuStrip menu)
     {
-        menu.Items.Clear();
+        // Dispose the previous items rather than just detaching them: ToolStripItemCollection.Clear()
+        // removes without disposing, leaving the discarded items (and the "Start focus session"
+        // submenu's ToolStripDropDown) to the finalizer. That's not a leak — the handle counts come
+        // out the same either way — it just releases what we're throwing away at a known point.
+        for (int i = menu.Items.Count - 1; i >= 0; i--)
+        {
+            ToolStripItem item = menu.Items[i];
+            menu.Items.RemoveAt(i);
+            item.Dispose();
+        }
 
         if (_focus.IsActive)
         {
@@ -572,12 +609,38 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
     private void RenderIcon()
     {
         double? fraction = _focus.IsActive ? _focus.RemainingFraction : null;
-        Icon newIcon = TrayIconRenderer.Render(_lastPulse, fraction);
+
+        Icon newIcon;
+        try
+        {
+            newIcon = TrayIconRenderer.Render(_lastPulse, fraction);
+        }
+        catch (Exception ex)
+        {
+            // Drawing can fail when the machine is short of GDI resources, and GDI+ reports every
+            // such failure as OutOfMemoryException regardless of the real cause — including a
+            // session-wide shortage that nothing in this process can do anything about. It isn't
+            // fatal for us: keep the icon that's already showing and redraw on the next tick.
+            NoteRenderFailure(ex);
+            return;
+        }
+
         _notifyIcon.Icon = newIcon;
 
         Icon? old = _currentIcon;
         _currentIcon = newIcon;
         old?.Dispose();
+    }
+
+    // Log the first failure and then at most one line every five minutes, so a shortage that lasts
+    // doesn't write a line a second while a focus session is counting down.
+    private void NoteRenderFailure(Exception ex)
+    {
+        _renderFailures++;
+        if (DateTime.Now - _lastRenderFailureLoggedAt < TimeSpan.FromMinutes(5)) return;
+
+        _lastRenderFailureLoggedAt = DateTime.Now;
+        ResourceLog.Failure($"icon render failed ({_renderFailures} since start)", ex);
     }
 
     private void UpdateTooltip()
@@ -768,6 +831,8 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
             _timer.Dispose();
             _focusPollTimer.Dispose();
             _reminderTimer.Dispose();
+            _diagTimer.Dispose();
+            _trimTimer.Dispose();
             _reminderForm?.Dispose();
             _popup?.Dispose();
             _achievementForm?.Dispose();
