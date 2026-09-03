@@ -22,6 +22,8 @@ public static class ResourceLog
     private const int GR_GDIOBJECTS = 0;
     private const int GR_USEROBJECTS = 1;
 
+    private static readonly object WriteGate = new();
+
     private static readonly string LogPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "RescueTimeStatus",
@@ -29,7 +31,33 @@ public static class ResourceLog
 
     /// <summary>Records one sample. Never throws — diagnostics must not take the app down.</summary>
     /// <param name="note">Short tag for the event that triggered the sample (e.g. "startup").</param>
-    public static void Sample(string note = "")
+    public static void Sample(string note = "") => Write(note, extra: null);
+
+    /// <summary>
+    /// Records a failure with the usual counters, followed by the processes holding the most GDI
+    /// objects. A drawing failure while our own GDI count is low means the shortage is session-wide,
+    /// and this line names whoever caused it.
+    /// </summary>
+    /// <param name="note">Short tag for what failed</param>
+    /// <param name="ex">The exception that triggered the sample, if there was one</param>
+    public static void Failure(string note, Exception? ex = null)
+    {
+        string? consumers = null;
+        try
+        {
+            consumers = "                       " + TopGdiConsumers(5);
+        }
+        catch
+        {
+            // Losing the extra detail mustn't cost us the counters line as well.
+        }
+
+        Write(ex is null ? note : $"{note} — {ex.GetType().Name}: {ex.Message}", consumers);
+    }
+
+    // Both lines of a failure go out in one append, so a sample from another thread can't land
+    // between the counters and the GDI breakdown they belong to.
+    private static void Write(string note, string? extra)
     {
         try
         {
@@ -47,32 +75,11 @@ public static class ResourceLog
                 "{0:yyyy-MM-dd HH:mm:ss}  managed={1,12:N0}  priv={2,14:N0}  ws={3,14:N0}  handles={4,6}  gdi={5,6}  user={6,6}  {7}",
                 DateTime.Now, managed, priv, ws, handles, gdi, user, note);
 
-            Append(line);
+            Append(extra is null ? line : line + Environment.NewLine + extra);
         }
         catch
         {
             // Best-effort: a diagnostic that fails must stay silent.
-        }
-    }
-
-    /// <summary>
-    /// Records a failure with the usual counters, followed by the processes holding the most GDI
-    /// objects. A drawing failure while our own GDI count is low means the shortage is session-wide,
-    /// and this line names whoever caused it.
-    /// </summary>
-    /// <param name="note">Short tag for what failed</param>
-    /// <param name="ex">The exception that triggered the sample, if there was one</param>
-    public static void Failure(string note, Exception? ex = null)
-    {
-        Sample(ex is null ? note : $"{note} — {ex.GetType().Name}: {ex.Message}");
-
-        try
-        {
-            Append("                       " + TopGdiConsumers(5));
-        }
-        catch
-        {
-            // As above — diagnostics never take the app down.
         }
     }
 
@@ -114,9 +121,15 @@ public static class ResourceLog
         return sb.ToString();
     }
 
+    // Samples come from the UI timers and from the unhandled-exception handlers, which run on
+    // whatever thread threw. Serialize the appends so two writers can't collide on the file at
+    // exactly the moment a failure makes the log worth having.
     private static void Append(string line)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
-        File.AppendAllText(LogPath, line + Environment.NewLine);
+        lock (WriteGate)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
+            File.AppendAllText(LogPath, line + Environment.NewLine);
+        }
     }
 }

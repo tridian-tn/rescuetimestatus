@@ -99,12 +99,16 @@ public sealed class TrayApplicationContext : ApplicationContext, IStatusControll
         _diagTimer.Tick += (_, _) => ResourceLog.Sample("periodic");
         _diagTimer.Start();
 
+        // Off the UI thread: GC.WaitForPendingFinalizers() blocks the caller, and blocking the STA
+        // thread that finalizers may need to marshal to is how deadlocks happen. It isn't for
+        // responsiveness — the whole trim measures ~6 ms, and a collection suspends every managed
+        // thread whichever one starts it.
         _trimTimer = new System.Windows.Forms.Timer { Interval = TrimIntervalMs };
-        _trimTimer.Tick += (_, _) =>
+        _trimTimer.Tick += (_, _) => _ = Task.Run(() =>
         {
             MemoryTrim.Run();
             ResourceLog.Sample("post-trim");
-        };
+        });
         _trimTimer.Start();
 
         if (string.IsNullOrWhiteSpace(_config.ApiKey))
