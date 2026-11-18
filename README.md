@@ -99,7 +99,7 @@ success. So a temporary outage won't keep hammering the API.
 ## Requirements
 
 - Windows 10/11
-- [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) — required to run the
+- [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) — required to run the
   released builds (they're framework-dependent). To produce a build that bundles the runtime
   instead, see "Build a single-file, self-contained .exe" below.
 
@@ -107,7 +107,7 @@ success. So a temporary outage won't keep hammering the API.
 
 Pushing a version tag publishes framework-dependent zips for **win-x64** and **win-arm64** to the
 [Releases](../../releases) page. Extract anywhere and run `RescueTimeStatus.exe` — the
-[.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) must be installed.
+[.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) must be installed.
 
 > **win-arm64 is untested.** It builds and is published, but hasn't been run on an ARM device.
 > If you try it, let me know how it goes.
@@ -118,7 +118,7 @@ Pushing a version tag publishes framework-dependent zips for **win-x64** and **w
 2. Build and run:
    ```bash
    dotnet build -c Release
-   ./bin/Release/net8.0-windows/RescueTimeStatus.exe
+   ./bin/Release/net10.0-windows/RescueTimeStatus.exe
    ```
 3. On first launch a **Settings** dialog appears — paste your API key and choose a refresh
    interval (default 5 minutes). The key is saved to
@@ -161,7 +161,7 @@ dotnet publish -c Release -r win-x64 --self-contained \
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 ```
 
-The result lands in `bin/Release/net8.0-windows/win-x64/publish/RescueTimeStatus.exe`.
+The result lands in `bin/Release/net10.0-windows/win-x64/publish/RescueTimeStatus.exe`.
 
 ## Versioning
 
